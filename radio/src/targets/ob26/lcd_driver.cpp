@@ -53,10 +53,12 @@
 #define LCD_RD_BIT        (1U << 3)
 #define LCD_RST_BIT       (1U << 4)
 
-// Bus timing, in NOPs at 400 MHz (~2.5 ns each). The ILI9486 needs roughly
-// 50 ns low and 50 ns high on WR; lower these once the panel is known good.
-#define LCD_WR_LOW_NOPS   16
-#define LCD_WR_HIGH_NOPS  16
+// WR low and high phase, in nanoseconds. Timed on the DWT cycle counter
+// (enabled by delaysInit()): __NOP() loops are not reliable on the Cortex-M7.
+// 500 ns is the value proven on the FK743 breakout with the hand-wired shield;
+// lower it in steps (e.g. 250, 120) to find the fastest reliable setting.
+#define LCD_WR_NS         500
+#define LCD_WR_CYCLES     ((CPU_FREQ / 1000000U) * LCD_WR_NS / 1000U)
 
 // MADCTL: MV (0x20) = landscape, BGR (0x08) = colour order.
 // Landscape rotated by 180 degrees: 0xE8. Swapped red/blue: clear BGR.
@@ -71,9 +73,12 @@ static void* initialFrameBuffer = nullptr;
 static pixel_t _shadow[LCD_W * LCD_H] __SDRAM __ALIGNED(4);
 static bool _shadowValid = false;
 
-static inline void nops(unsigned n)
+static inline void busDelay(uint32_t cycles)
 {
-  while (n--) __NOP();
+  (void)LCD_CTRL_PORT->IDR;  // make sure the previous pin store reached the port
+  uint32_t start = DWT->CYCCNT;
+  while (DWT->CYCCNT - start < cycles) {
+  }
 }
 
 static inline void busWrite(uint8_t b)
@@ -82,11 +87,9 @@ static inline void busWrite(uint8_t b)
       ((uint32_t)b << LCD_DATA_SHIFT) |
       ((uint32_t)(uint8_t)~b << (16 + LCD_DATA_SHIFT));
   LCD_CTRL_PORT->BSRR = (uint32_t)LCD_WR_BIT << 16;  // WR low
-  __DSB();
-  nops(LCD_WR_LOW_NOPS);
+  busDelay(LCD_WR_CYCLES);
   LCD_CTRL_PORT->BSRR = LCD_WR_BIT;                   // WR high: data latched
-  __DSB();
-  nops(LCD_WR_HIGH_NOPS);
+  busDelay(LCD_WR_CYCLES);
 }
 
 static inline void lcdCmd(uint8_t c)
@@ -104,14 +107,16 @@ static void lcdCmdData(uint8_t c, const uint8_t* d, unsigned n)
   for (unsigned i = 0; i < n; i++) lcdData(d[i]);
 }
 
+// Slow edges on purpose: fast edges ring on long jumper wires and
+// double-clock WR, which leaves the panel white.
 static void lcdGpioInit()
 {
   for (int i = 0; i < 8; i++) {
     gpio_init(GPIO_PIN(GPIOB, (LCD_DATA_SHIFT + i)), GPIO_OUT,
-              GPIO_PIN_SPEED_VERY_HIGH);
+              GPIO_PIN_SPEED_LOW);
   }
   for (int i = 0; i < 5; i++) {
-    gpio_init(GPIO_PIN(GPIOI, i), GPIO_OUT, GPIO_PIN_SPEED_VERY_HIGH);
+    gpio_init(GPIO_PIN(GPIOI, i), GPIO_OUT, GPIO_PIN_SPEED_LOW);
   }
   // idle: CS high, WR high, RD high, RS high, RST high
   LCD_CTRL_PORT->BSRR = LCD_WR_BIT | LCD_RS_BIT | LCD_CS_BIT | LCD_RD_BIT |
@@ -131,33 +136,25 @@ static void lcdReset()
   delay_ms(150);
 }
 
+// Init sequence verified on the FK743 + 3.5" ILI9486 shield (ili9486_fk743.cpp)
 static void lcdPanelInit()
 {
   csLow();
 
+  lcdCmd(0x01);                       // software reset
+  delay_ms(150);
   lcdCmd(0x11);                       // sleep out
   delay_ms(150);
 
-  { const uint8_t d[] = {0x00}; lcdCmdData(0xB0, d, 1); }  // interface mode
-  { const uint8_t d[] = {0x55}; lcdCmdData(0x3A, d, 1); }  // 16 bit / pixel
-  { const uint8_t d[] = {0x44}; lcdCmdData(0xC2, d, 1); }  // power control 3
-  { const uint8_t d[] = {0x00, 0x00, 0x00, 0x00}; lcdCmdData(0xC5, d, 4); }  // VCOM
-
-  {
-    const uint8_t d[] = {0x0F, 0x1F, 0x1C, 0x0C, 0x0F, 0x08, 0x48, 0x98,
-                         0x37, 0x0A, 0x13, 0x04, 0x11, 0x0D, 0x00};
-    lcdCmdData(0xE0, d, sizeof(d));   // positive gamma
-  }
-  {
-    const uint8_t d[] = {0x0F, 0x32, 0x2E, 0x0B, 0x0D, 0x05, 0x47, 0x75,
-                         0x37, 0x06, 0x10, 0x03, 0x24, 0x20, 0x00};
-    lcdCmdData(0xE1, d, sizeof(d));   // negative gamma
-    lcdCmdData(0xE2, d, sizeof(d));   // digital gamma
-  }
-
-  lcdCmd(LCD_INVERT ? 0x21 : 0x20);   // display inversion off / on
+  { const uint8_t d[] = {0x55}; lcdCmdData(0x3A, d, 1); }              // 16 bit / pixel
+  { const uint8_t d[] = {0x0D, 0x0D}; lcdCmdData(0xC0, d, 2); }        // power control 1
+  { const uint8_t d[] = {0x43, 0x00}; lcdCmdData(0xC1, d, 2); }        // power control 2
+  { const uint8_t d[] = {0x00}; lcdCmdData(0xC2, d, 1); }              // power control 3
+  { const uint8_t d[] = {0x00, 0x48, 0x00, 0x48}; lcdCmdData(0xC5, d, 4); }  // VCOM
+  { const uint8_t d[] = {0x02, 0x02, 0x3B}; lcdCmdData(0xB6, d, 3); }  // display function
   { const uint8_t d[] = {LCD_MADCTL}; lcdCmdData(0x36, d, 1); }
 
+  lcdCmd(LCD_INVERT ? 0x21 : 0x20);   // inversion on / off
   lcdCmd(0x29);                       // display on
   delay_ms(50);
 
@@ -259,12 +256,29 @@ void lcdSetInitalFrameBuffer(void* fbAddress)
   initialFrameBuffer = fbAddress;
 }
 
+// Bring-up aid: fill the panel with solid colours straight over the bus.
+static void lcdSelfTest()
+{
+  static const uint16_t colors[] = {0xF800, 0x07E0, 0x001F};  // R, G, B
+  csLow();
+  for (unsigned c = 0; c < 3; c++) {
+    lcdSetWindow(0, 0, LCD_W - 1, LCD_H - 1);
+    for (unsigned i = 0; i < LCD_W * LCD_H; i++) {
+      busWrite(colors[c] >> 8);
+      busWrite(colors[c] & 0xFF);
+    }
+    delay_ms(1000);
+  }
+  csHigh();
+}
+
 extern "C"
 void lcdInit(void)
 {
   lcdGpioInit();
   lcdReset();
   lcdPanelInit();
+  lcdSelfTest();
 
   _shadowValid = false;
   TRACE("LCD INIT: ILI9486 8-bit parallel");
