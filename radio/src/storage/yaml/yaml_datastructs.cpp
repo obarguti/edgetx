@@ -52,6 +52,8 @@
  #include "yaml_datastructs_v12.cpp"
 #elif defined(PCBH17)
  #include "yaml_datastructs_h17.cpp"
+#elif defined(PCBOB26)
+ #include "yaml_datastructs_ob26.cpp"
 #elif defined(RADIO_T22)
   #include "yaml_datastructs_t22.cpp"
 #elif defined(PCBV15)

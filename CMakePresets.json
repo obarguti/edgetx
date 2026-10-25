@@ -335,6 +335,12 @@
       "cacheVariables": { "PCB": "X10", "PCBREV": "TX16S" }
     },
     {
+      "name": "ob26",
+      "displayName": "OB26 (STM32H743 custom)",
+      "inherits": "firmware",
+      "cacheVariables": { "PCB": "OB26" }
+    },
+    {
       "name": "tx16smk3",
       "displayName": "RadioMaster TX16S MK3",
       "inherits": "firmware",

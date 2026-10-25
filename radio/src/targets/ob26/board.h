@@ -1,0 +1,185 @@
+/*
+ * Copyright (C) EdgeTX
+ *
+ * Based on code named
+ *   opentx - https://github.com/opentx/opentx
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#ifndef _BOARD_H_
+#define _BOARD_H_
+
+#include "definitions.h"
+#include "edgetx_constants.h"
+
+#include "board_common.h"
+#include "hal.h"
+#include "hal/serial_port.h"
+#include "hal/watchdog_driver.h"
+
+// Internal flash layout (see linker/stm32h743_sdram):
+//   0x08000000  bootloader (128 KB)
+//   0x08020000  firmware   (1920 KB)
+#define FLASHSIZE                       0x200000
+#define FLASH_PAGESIZE                  256
+#define BOOTLOADER_ADDRESS              0x08000000
+#define BOOTLOADER_SIZE                 0x20000
+#define FIRMWARE_ADDRESS                0x08020000
+#define FIRMWARE_LEN(fsize)             (fsize)
+#define FIRMWARE_MAX_LEN                (FLASHSIZE - BOOTLOADER_SIZE)
+#define APP_START_ADDRESS               (uint32_t)(FIRMWARE_ADDRESS)
+
+#define BOOTLOADER_KEYS                 0x42
+
+#define MB                              *1024*1024
+#define LUA_MEM_EXTRA_MAX               (2 MB)    // max allowed memory usage for Lua bitmaps (in bytes)
+#define LUA_MEM_MAX                     (6 MB)    // max allowed memory usage for complete Lua  (in bytes), 0 means unlimited
+
+extern uint16_t sessionTimer;
+
+#define SLAVE_MODE()                    (g_model.trainerData.mode == TRAINER_MODE_SLAVE)
+
+// Board driver
+void boardInit();
+void boardOff();
+
+// CPU Unique ID
+#define LEN_CPU_UID                     (3*8+2)
+void getCPUUniqueID(char * s);
+
+// SDRAM driver
+extern "C" void SDRAM_Init();
+extern "C" bool SDRAM_Test();
+
+// Pulses driver: no RF module fitted yet
+#define INTERNAL_MODULE_ON()
+#define INTERNAL_MODULE_OFF()
+#define EXTERNAL_MODULE_ON()
+#define EXTERNAL_MODULE_OFF()
+#define EXTERNAL_MODULE_PWR_OFF()
+#define BLUETOOTH_MODULE_ON()
+#define BLUETOOTH_MODULE_OFF()
+#define IS_INTERNAL_MODULE_ON()         (false)
+#define IS_EXTERNAL_MODULE_ON()         (false)
+
+#define NUM_FUNCTIONS_SWITCHES          0
+
+#define NUM_TRIMS                       8
+#define DEFAULT_STICK_DEADZONE          2
+
+// No battery sensing on the core board, the ADC value is faked in boardInit()
+#define BATTERY_WARN                  37 // 3.7V
+#define BATTERY_MIN                   35 // 3.4V
+#define BATTERY_MAX                   84 // 8.4V
+#define BATTERY_DIVIDER             1000
+
+#if defined(__cplusplus) && !defined(SIMU)
+extern "C" {
+#endif
+
+// Power driver: no power switch, the board is always on
+#define SOFT_PWR_CTRL
+#define POWER_ON_DELAY               10 // 1s
+void pwrInit();
+void extModuleInit();
+uint32_t pwrCheck();
+uint32_t lowPowerCheck();
+
+void pwrOn();
+void pwrSoftReboot();
+void pwrOff();
+void pwrResetHandler();
+bool pwrPressed();
+bool pwrOffPressed();
+#define pwrForcePressed() false
+uint32_t pwrPressedDuration();
+
+const etx_serial_port_t* auxSerialGetPort(int port_nr);
+#define AUX_SERIAL_POWER_ON()
+#define AUX_SERIAL_POWER_OFF()
+
+// LED driver (user LED on the core board)
+void ledInit();
+void ledOff();
+void ledRed();
+void ledBlue();
+void ledGreen();
+
+// LCD driver
+void lcdSetInitalFrameBuffer(void* fbAddress);
+void lcdInit();
+void lcdCopy(void * dest, void * src);
+
+void lcdOff();
+void lcdOn();
+
+#define lcdRefreshWait(...)
+
+// Backlight driver
+#define BACKLIGHT_LEVEL_MAX             100
+#define BACKLIGHT_FORCED_ON             BACKLIGHT_LEVEL_MAX + 1
+#define BACKLIGHT_LEVEL_MIN             1
+
+extern bool boardBacklightOn;
+void backlightLowInit( void );
+void backlightInit();
+void backlightEnable(uint8_t dutyCycle);
+void backlightFullOn();
+bool isBacklightEnabled();
+
+#define BACKLIGHT_ENABLE()                                         \
+  {                                                                \
+    boardBacklightOn = true;                                       \
+    backlightEnable(BACKLIGHT_LEVEL_MAX - currentBacklightBright); \
+  }
+
+#define BACKLIGHT_DISABLE()                                               \
+  {                                                                       \
+    boardBacklightOn = false;                                             \
+    backlightEnable(((g_eeGeneral.blOffBright == BACKLIGHT_LEVEL_MIN) &&  \
+                     (g_eeGeneral.backlightMode != e_backlight_mode_off)) \
+                        ? 0                                               \
+                        : g_eeGeneral.blOffBright);                       \
+  }
+
+#if defined(__cplusplus) && !defined(SIMU)
+}
+#endif
+
+// Audio driver
+int audioInit();
+void audioConsumeCurrentBuffer();
+
+// Telemetry driver
+#define INTMODULE_FIFO_SIZE            512
+#define TELEMETRY_FIFO_SIZE            512
+
+// Haptic driver
+void hapticInit();
+void hapticDone();
+void hapticOff();
+void hapticOn(uint32_t pwmPercent);
+
+// Second serial port driver
+#define DEBUG_BAUDRATE                  115200
+#define LUA_DEFAULT_BAUDRATE            115200
+
+extern uint8_t currentTrainerMode;
+void checkTrainerSettings();
+
+#define IS_FIRMWARE_COMPATIBLE_WITH_BOARD() true
+
+#endif // _BOARD_H_
