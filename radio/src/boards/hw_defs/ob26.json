@@ -310,8 +310,8 @@
   "display": {
     "lcd_w": 480,
     "lcd_h": 320,
-    "lcd_phys_w": 320,
-    "lcd_phys_h": 480,
+    "lcd_phys_w": 480,
+    "lcd_phys_h": 320,
     "lcd_depth": 16,
     "ltdc_irq_prio": 4,
     "dma_screen_irq_prio": 6
