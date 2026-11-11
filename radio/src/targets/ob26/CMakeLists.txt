@@ -80,6 +80,7 @@ set(BOARD_COMMON_SRC
   targets/common/arm/stm32/delays_driver.cpp
   targets/common/arm/stm32/dma2d.cpp
   targets/common/arm/stm32/flash_driver.cpp
+  targets/common/arm/stm32/rotary_encoder_driver.cpp
   targets/common/arm/stm32/pwr_driver.cpp
   targets/common/arm/stm32/rtc_driver.cpp
   targets/common/arm/stm32/watchdog_driver.cpp

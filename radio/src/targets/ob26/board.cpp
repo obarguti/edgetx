@@ -31,6 +31,7 @@
 #include "hal/watchdog_driver.h"
 #include "hal/usb_driver.h"
 #include "hal/gpio.h"
+#include "hal/rotary_encoder.h"
 
 #include "globals.h"
 #include "sdcard.h"
@@ -81,6 +82,7 @@ void boardBLEarlyInit()
 {
   ledInit();
   backlightLowInit();
+  rotaryEncoderInit();
   timersInit();
   delaysInit();
 }
@@ -103,6 +105,7 @@ void boardBLPreJump()
 
 void boardBLInit()
 {
+  rotaryEncoderInit();
   SDRAM_Init();
 }
 

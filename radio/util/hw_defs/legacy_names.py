@@ -90,7 +90,7 @@ LEGACY_NAMES = [
         }
     },
     {
-        "targets": {"tx16smk3"},
+        "targets": {"tx16smk3", "ob26"},
         "inputs": {
             "LH": {
                 "yaml": "Rud",
@@ -1313,7 +1313,7 @@ LEGACY_NAMES = [
         },
     },
     {
-        "targets": {"h747", "h7rs", "ob26"},
+        "targets": {"h747", "h7rs"},
         "inputs": {
             "LH": {"yaml": "Rud", "lua": "rud", "description": "Rudder"},
             "LV": {"yaml": "Ele", "lua": "ele", "description": "Elevator"},
