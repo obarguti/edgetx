@@ -35,23 +35,22 @@
 // 8-bit parallel (Intel 8080) ILI9486 driver, bit-banged over GPIO.
 //
 // Wiring (3.5" ILI9486 Arduino shield):
-//   D0..D7 -> PB8..PB15  (high byte of GPIOB, written with one BSRR store)
-//   WR  -> PI0     RS -> PI1     CS -> PI2     RD -> PI3 (kept high)
-//   RST -> PI4
+//   D0..D7 -> PI0..PI7  (low byte of GPIOI, written with one BSRR store)
+//   RD  -> PD3 (kept high)   RST -> PD4   CS -> PD5   RS -> PD6   WR -> PD7
 //
 // The panel is run in landscape (MV) at 480x320, RGB565 (two bus cycles per
 // pixel). EdgeTX hands over the whole frame buffer on every flush but only
 // reports the last dirty area, so the driver diffs the frame against a shadow
 // copy and only sends the rectangles that changed.
 
-#define LCD_DATA_PORT     GPIOB
-#define LCD_DATA_SHIFT    8
-#define LCD_CTRL_PORT     GPIOI
-#define LCD_WR_BIT        (1U << 0)
-#define LCD_RS_BIT        (1U << 1)
-#define LCD_CS_BIT        (1U << 2)
+#define LCD_DATA_PORT     GPIOI
+#define LCD_DATA_SHIFT    0
+#define LCD_CTRL_PORT     GPIOD
 #define LCD_RD_BIT        (1U << 3)
 #define LCD_RST_BIT       (1U << 4)
+#define LCD_CS_BIT        (1U << 5)
+#define LCD_RS_BIT        (1U << 6)
+#define LCD_WR_BIT        (1U << 7)
 
 // WR low and high phase, in nanoseconds. Timed on the DWT cycle counter
 // (enabled by delaysInit()): __NOP() loops are not reliable on the Cortex-M7.
@@ -65,6 +64,12 @@
 #define LCD_MADCTL        0x28
 // Set to 1 if colours look inverted.
 #define LCD_INVERT        0
+
+// Set to 1 (or build with -DLCD_SELFTEST=1) to fill the panel with red, green
+// and blue for 1 s each at boot, as a quick check of wiring and timing.
+#ifndef LCD_SELFTEST
+#define LCD_SELFTEST      0
+#endif
 
 const char* boardLcdType = "ILI9486 8-bit";
 
@@ -112,11 +117,11 @@ static void lcdCmdData(uint8_t c, const uint8_t* d, unsigned n)
 static void lcdGpioInit()
 {
   for (int i = 0; i < 8; i++) {
-    gpio_init(GPIO_PIN(GPIOB, (LCD_DATA_SHIFT + i)), GPIO_OUT,
+    gpio_init(GPIO_PIN(LCD_DATA_PORT, (LCD_DATA_SHIFT + i)), GPIO_OUT,
               GPIO_PIN_SPEED_LOW);
   }
-  for (int i = 0; i < 5; i++) {
-    gpio_init(GPIO_PIN(GPIOI, i), GPIO_OUT, GPIO_PIN_SPEED_LOW);
+  for (int i = 3; i < 8; i++) {
+    gpio_init(GPIO_PIN(LCD_CTRL_PORT, i), GPIO_OUT, GPIO_PIN_SPEED_LOW);
   }
   // idle: CS high, WR high, RD high, RS high, RST high
   LCD_CTRL_PORT->BSRR = LCD_WR_BIT | LCD_RS_BIT | LCD_CS_BIT | LCD_RD_BIT |
@@ -256,6 +261,7 @@ void lcdSetInitalFrameBuffer(void* fbAddress)
   initialFrameBuffer = fbAddress;
 }
 
+#if LCD_SELFTEST
 // Bring-up aid: fill the panel with solid colours straight over the bus.
 static void lcdSelfTest()
 {
@@ -271,6 +277,7 @@ static void lcdSelfTest()
   }
   csHigh();
 }
+#endif
 
 extern "C"
 void lcdInit(void)
@@ -278,7 +285,9 @@ void lcdInit(void)
   lcdGpioInit();
   lcdReset();
   lcdPanelInit();
+#if LCD_SELFTEST
   lcdSelfTest();
+#endif
 
   _shadowValid = false;
   TRACE("LCD INIT: ILI9486 8-bit parallel");
