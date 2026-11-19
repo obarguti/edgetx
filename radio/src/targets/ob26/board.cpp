@@ -82,7 +82,6 @@ void boardBLEarlyInit()
 {
   ledInit();
   backlightLowInit();
-  rotaryEncoderInit();
   timersInit();
   delaysInit();
 }
@@ -128,6 +127,7 @@ void boardInit()
   pwrInit();
   delaysInit();
   timersInit();
+  rotaryEncoderInit();
 
   usbInit();
 
