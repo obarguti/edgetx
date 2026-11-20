@@ -26,28 +26,14 @@
 
 bool boardBacklightOn = false;
 
-// The backlight is a plain on/off GPIO until the real panel is wired up.
-void backlightLowInit()
-{
-  gpio_init(LCD_BACKLIGHT_GPIO, GPIO_OUT, GPIO_PIN_SPEED_LOW);
-  gpio_clear(LCD_BACKLIGHT_GPIO);
-}
+// The shield's backlight is not switched by the MCU (PH6 is the blue LED),
+// so these only track the requested state.
+void backlightLowInit() {}
 
-void backlightInit() { backlightLowInit(); }
+void backlightInit() {}
 
 bool isBacklightEnabled() { return boardBacklightOn; }
 
-void backlightFullOn()
-{
-  boardBacklightOn = true;
-  gpio_set(LCD_BACKLIGHT_GPIO);
-}
+void backlightFullOn() { boardBacklightOn = true; }
 
-void backlightEnable(uint8_t dutyCycle)
-{
-  if (dutyCycle) {
-    gpio_set(LCD_BACKLIGHT_GPIO);
-  } else {
-    gpio_clear(LCD_BACKLIGHT_GPIO);
-  }
-}
+void backlightEnable(uint8_t dutyCycle) { boardBacklightOn = dutyCycle != 0; }

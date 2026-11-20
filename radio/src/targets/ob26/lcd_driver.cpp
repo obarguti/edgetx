@@ -62,14 +62,6 @@
 // MADCTL: MV (0x20) = landscape, BGR (0x08) = colour order.
 // Landscape rotated by 180 degrees: 0xE8. Swapped red/blue: clear BGR.
 #define LCD_MADCTL        0x28
-// Set to 1 if colours look inverted.
-#define LCD_INVERT        0
-
-// Set to 1 (or build with -DLCD_SELFTEST=1) to fill the panel with red, green
-// and blue for 1 s each at boot, as a quick check of wiring and timing.
-#ifndef LCD_SELFTEST
-#define LCD_SELFTEST      0
-#endif
 
 const char* boardLcdType = "ILI9486 8-bit";
 
@@ -159,7 +151,7 @@ static void lcdPanelInit()
   { const uint8_t d[] = {0x02, 0x02, 0x3B}; lcdCmdData(0xB6, d, 3); }  // display function
   { const uint8_t d[] = {LCD_MADCTL}; lcdCmdData(0x36, d, 1); }
 
-  lcdCmd(LCD_INVERT ? 0x21 : 0x20);   // inversion on / off
+  lcdCmd(0x20);                       // display inversion off
   lcdCmd(0x29);                       // display on
   delay_ms(50);
 
@@ -261,33 +253,12 @@ void lcdSetInitalFrameBuffer(void* fbAddress)
   initialFrameBuffer = fbAddress;
 }
 
-#if LCD_SELFTEST
-// Bring-up aid: fill the panel with solid colours straight over the bus.
-static void lcdSelfTest()
-{
-  static const uint16_t colors[] = {0xF800, 0x07E0, 0x001F};  // R, G, B
-  csLow();
-  for (unsigned c = 0; c < 3; c++) {
-    lcdSetWindow(0, 0, LCD_W - 1, LCD_H - 1);
-    for (unsigned i = 0; i < LCD_W * LCD_H; i++) {
-      busWrite(colors[c] >> 8);
-      busWrite(colors[c] & 0xFF);
-    }
-    delay_ms(1000);
-  }
-  csHigh();
-}
-#endif
-
 extern "C"
 void lcdInit(void)
 {
   lcdGpioInit();
   lcdReset();
   lcdPanelInit();
-#if LCD_SELFTEST
-  lcdSelfTest();
-#endif
 
   _shadowValid = false;
   TRACE("LCD INIT: ILI9486 8-bit parallel");

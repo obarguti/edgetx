@@ -111,7 +111,8 @@ const etx_serial_port_t* auxSerialGetPort(int port_nr);
 #define AUX_SERIAL_POWER_ON()
 #define AUX_SERIAL_POWER_OFF()
 
-// LED driver (user LED on the core board)
+// Status LED driver (RGB LED, EdgeTX's stock driver in the firmware)
+void ledBoot();
 void ledInit();
 void ledOff();
 void ledRed();

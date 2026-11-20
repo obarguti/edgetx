@@ -55,6 +55,9 @@ set(AUX_SERIAL YES)
 
 add_definitions(-DAUDIO -DVOICE)
 
+# RGB status LED: colour per state and brightness (EdgeTX's stock LED driver)
+add_definitions(-DSTATUS_LED_PWM)
+
 if(NOT UNEXPECTED_SHUTDOWN)
   add_definitions(-DNO_UNEXPECTED_SHUTDOWN)
 endif()

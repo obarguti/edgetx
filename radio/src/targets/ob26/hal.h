@@ -34,6 +34,7 @@ Stream4:  ADC_DMA_STREAM (do not move)
 
 TIM12:  MIXER_SCHEDULER_TIMER
 TIM14:  MS_TIMER
+TIM7:   STATUS_LED_PWM_TIMER
 
 USART1: AUX_SERIAL_USART (debug / CLI, PA9 TX / PA10 RX)
 
@@ -57,8 +58,6 @@ Pins used by the core board (do not reuse):
 // User LED on the core board (PH7)
 #define LED_USER_GPIO                   GPIO_PIN(GPIOH, 7)
 
-// LCD backlight (PH6 on the core board's RGB connector)
-#define LCD_BACKLIGHT_GPIO              GPIO_PIN(GPIOH, 6)
 
 // SD card (SDMMC1)
 #define SD_SDIO                         SDMMC1

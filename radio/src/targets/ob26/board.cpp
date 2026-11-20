@@ -47,33 +47,53 @@
 extern const etx_hal_adc_driver_t _adc_driver;
 
 //
-// Status LED
+// LEDs
 //
-// The only LED on the core board (PH7) is fed from 3.3V through a resistor,
-// so the pin has to be pulled low to light it.
+// The core board's user LED (PH7) is fed from 3.3V through a resistor, so the
+// pin has to be pulled low to light it.
 //
-void ledInit()
+static void userLedInit()
 {
   gpio_init(LED_USER_GPIO, GPIO_OUT, GPIO_PIN_SPEED_LOW);
   gpio_set(LED_USER_GPIO);
 }
 
-static inline void ledOn() { gpio_clear(LED_USER_GPIO); }
-
-void ledOff() { gpio_set(LED_USER_GPIO); }
-void ledRed() { ledOn(); }
-void ledGreen() { ledOn(); }
-void ledBlue() { ledOn(); }
+static void userLedOn() { gpio_clear(LED_USER_GPIO); }
+static void userLedOff() { gpio_set(LED_USER_GPIO); }
 
 static void ledBlink(unsigned count, unsigned on_ms, unsigned off_ms)
 {
   for (unsigned i = 0; i < count; i++) {
-    ledOn();
+    userLedOn();
     delay_ms(on_ms);
-    ledOff();
+    userLedOff();
     delay_ms(off_ms);
   }
 }
+
+#if defined(BOOT)
+// The bootloader has no stock LED driver: it only needs the LEDs off (RGB LED
+// is common cathode, low = off) and the user LED for the blink codes. The
+// firmware uses EdgeTX's own status LED driver (colour per state, brightness).
+void ledInit()
+{
+  userLedInit();
+  gpio_init(LED_RED_GPIO, GPIO_OUT, GPIO_PIN_SPEED_LOW);
+  gpio_init(LED_GREEN_GPIO, GPIO_OUT, GPIO_PIN_SPEED_LOW);
+  gpio_init(LED_BLUE_GPIO, GPIO_OUT, GPIO_PIN_SPEED_LOW);
+  gpio_clear(LED_RED_GPIO);
+  gpio_clear(LED_GREEN_GPIO);
+  gpio_clear(LED_BLUE_GPIO);
+}
+
+void ledOff()
+{
+  userLedOff();
+  gpio_clear(LED_RED_GPIO);
+  gpio_clear(LED_GREEN_GPIO);
+  gpio_clear(LED_BLUE_GPIO);
+}
+#endif
 
 //
 // Bootloader hooks
@@ -122,6 +142,7 @@ void boardInit()
 #endif
 
   ledInit();
+  userLedInit();
   backlightLowInit();
 
   pwrInit();
@@ -140,6 +161,9 @@ void boardInit()
   // No battery sensing yet: report a healthy 8.4V / 3.0V
   setAnalogValue(adcGetInputOffset(ADC_INPUT_VBAT), 840 * 2);
   setAnalogValue(adcGetInputOffset(ADC_INPUT_RTC_BAT), 300 * 2);
+
+  // all status LED colours on until the radio reports itself ready
+  ledBoot();
 }
 
 extern void rtcDisableBackupReg();
@@ -177,17 +201,7 @@ void boardOff()
 }
 
 #if !defined(BOOT)
-// Firmware heartbeat on the user LED: 3 s on, 3 s off
-void per5ms()
-{
-  static uint16_t ticks = 0;
-  if (ticks == 0) {
-    ledOn();
-  } else if (ticks == 600) {
-    ledOff();
-  }
-  if (++ticks >= 1200) ticks = 0;
-}
+void per5ms() {}
 #endif
 
 // The core board has no VBUS sense line (PA9 is the USART1 TX debug pin), so
